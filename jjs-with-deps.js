@@ -118,6 +118,10 @@ var scriptDeps = parseScriptDependencies($ARG[0]); //java.util.Arrays.asList(["o
 
 // And now setup the classloader for the script execution with the dependencies in place
 function createScriptClassLoader() {
+  if (scriptDeps.size() == 0) {
+    // We need no additional dependencies
+    return thread.getContextClassLoader();
+  }
   var Maven = shrinkwrapCL.loadClass("org.jboss.shrinkwrap.resolver.api.maven.Maven");
   var Archive = shrinkwrapCL.loadClass("org.jboss.shrinkwrap.api.Archive");
   var JavaArchive = shrinkwrapCL.loadClass("org.jboss.shrinkwrap.api.spec.JavaArchive");
