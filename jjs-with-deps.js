@@ -16,6 +16,8 @@
 # # dep:org.jboss.shrinkwrap.resolver:shrinkwrap-resolver-depchain:pom:2.1.1
 #
 
+var debugEnabled = java.lang.System.getProperty("jjs.debug") != null;
+
 // Check that we have the POM for shrinkwrap in place, and if not, ask Maven to sort that
 // out for us
 function isShrinkwrapInstalled() {
@@ -115,6 +117,9 @@ function parseScriptDependencies(script) {
   return deps;
 }
 var scriptDeps = parseScriptDependencies($ARG[0]); //java.util.Arrays.asList(["org.apache.commons:commons-lang3:3.3.2"]);
+if (debugEnabled) {
+  java.lang.System.err.println("jjs-with-deps: Script deps are " + scriptDeps);
+}
 
 // And now setup the classloader for the script execution with the dependencies in place
 function createScriptClassLoader() {
@@ -123,20 +128,28 @@ function createScriptClassLoader() {
     return thread.getContextClassLoader();
   }
   var Maven = shrinkwrapCL.loadClass("org.jboss.shrinkwrap.resolver.api.maven.Maven");
-  var Archive = shrinkwrapCL.loadClass("org.jboss.shrinkwrap.api.Archive");
-  var JavaArchive = shrinkwrapCL.loadClass("org.jboss.shrinkwrap.api.spec.JavaArchive");
-  var scriptArchives = Maven.getDeclaredMethod("resolver").invoke(null, [])
+  var URL = shrinkwrapCL.loadClass("java.net.URL");
+  var scriptArchives = java.util.Arrays.asList(Maven.getDeclaredMethod("resolver").invoke(null, [])
     .resolve(scriptDeps)
     .withTransitivity()
-    .as(JavaArchive);
+    .asFile())
+    .stream()
+    // Convert to a List of URLs of JAR form. We do this rather than using a ShrinkwrapClassLoader
+    // because there are some libraries (e.g. jogamp's jocl/jogl) which rely on the URLs of the JARs
+    // to be of the form file:///XXXX. Since we know we're only dealing with Maven artifacts, skipping
+    // the use of the ShrinkwrapClassLoader should be safe.
+    .map(function(f) {
+      return new java.net.URL(f.toURI().toURL());
+    })
+    .collect(java.util.stream.Collectors.toList())
+    // And to a URL[] to pass to the classloader.
+    .toArray(java.lang.reflect.Array.newInstance(URL, 0));
+  if (debugEnabled) {
+    java.lang.System.err.println("jjs-with-deps CL URLs: " + java.util.Arrays.asList(scriptArchives));
+  }
 
-  //Create the classloader from the shrinkwrap JavaArchive array
-  return shrinkwrapCL
-    .loadClass("org.jboss.shrinkwrap.api.classloader.ShrinkWrapClassLoader")
-    .getDeclaredConstructor(java.lang.ClassLoader.class,
-			    //This allows us to find the Class instance for Archive[]
-			    java.lang.reflect.Array.newInstance(Archive, 0).getClass())
-    .newInstance(originalCL, scriptArchives);
+  //Create the classloader from the URL array
+  return new java.net.URLClassLoader(scriptArchives, originalCL);
 };
 var scriptCL = createScriptClassLoader();
 thread.setContextClassLoader(scriptCL);
