@@ -116,7 +116,7 @@ function parseScriptDependencies(script) {
   }
   return deps;
 }
-var scriptDeps = parseScriptDependencies($ARG[0]); //java.util.Arrays.asList(["org.apache.commons:commons-lang3:3.3.2"]);
+var scriptDeps = parseScriptDependencies($ARG[1]); //java.util.Arrays.asList(["org.apache.commons:commons-lang3:3.3.2"]);
 if (debugEnabled) {
   java.lang.System.err.println("jjs-with-deps: Script deps are " + scriptDeps);
 }
@@ -160,4 +160,4 @@ var engineArgs = ["-scripting"].concat($ARG.slice(1, $ARG.length));
 scriptCL.loadClass("jdk.nashorn.api.scripting.NashornScriptEngineFactory")
   .newInstance()
   .getScriptEngine(engineArgs)
-  .eval("load('" + $ARG[0] + "')");
+  .eval("load('" + $ARG[1] + "')");
